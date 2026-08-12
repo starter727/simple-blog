@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}文章设置{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">文章设置</h1>
+
+    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+        <p class="text-sm text-gray-600"><strong>标题：</strong>{{ article.title }}</p>
+        <p class="text-sm text-gray-600 font-mono"><strong>Slug：</strong>{{ article.slug }}</p>
+        <p class="text-xs text-gray-400 mt-2">内容来自文件，此处仅管理可见性等元数据</p>
+    </div>
+
+    {% if error %}
+    <div class="bg-red-50 text-red-600 px-4 py-2 rounded mb-4 text-sm">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">可见性</label>
+            <select name="visibility"
+                    class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="public" {{ 'selected' if article.visibility == 'public' }}>🌍 公开 - 所有人可见</option>
+                <option value="restricted" {{ 'selected' if article.visibility == 'restricted' }}>👥 部分可见 - 指定用户</option>
+                <option value="private" {{ 'selected' if article.visibility == 'private' }}>🔒 仅自己可见</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+                文章密码 <span class="text-gray-400">(留空则不加密)</span>
+            </label>
+            <input type="text" name="password" placeholder="留空保持原密码"
+                   class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <label class="flex items-center space-x-2">
+                <input type="checkbox" name="is_published" value="true"
+                       {{ 'checked' if article.is_published else '' }}
+                       class="rounded border-gray-300">
+                <span class="text-sm text-gray-700">已发布</span>
+            </label>
+        </div>
+
+        <div class="flex space-x-3 pt-4">
+            <button type="submit"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                保存设置
+            </button>
+            <a href="/admin/" class="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition">
+                取消
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

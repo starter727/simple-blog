@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}文章列表{% endblock %}
+{% block content %}
+<div class="mb-10">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">文章</h1>
+    <p class="text-gray-500">记录思考，分享知识</p>
+</div>
+
+<div class="space-y-6">
+    {% for article in articles %}
+    <article class="group bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 border border-gray-100 hover:border-blue-100">
+        <div class="flex justify-between items-start mb-3">
+            <a href="/article/{{ article.slug }}"
+               class="text-xl font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                {{ article.title }}
+            </a>
+            <div class="flex items-center space-x-2 ml-4 flex-shrink-0">
+                {% if article.visibility == 'private' %}
+                <span class="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full border border-red-100">🔒 仅自己</span>
+                {% elif article.visibility == 'restricted' %}
+                <span class="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-100">👥 部分可见</span>
+                {% endif %}
+                {% if article.password_hash %}
+                <span class="text-xs bg-gray-50 text-gray-600 px-2.5 py-1 rounded-full border border-gray-200">🔐 密码</span>
+                {% endif %}
+            </div>
+        </div>
+        {% if article.summary %}
+        <p class="text-gray-600 text-sm mb-4 leading-relaxed">{{ article.summary }}</p>
+        {% endif %}
+        <div class="flex items-center justify-between">
+            <time class="text-xs text-gray-400 font-mono">{{ article.created_at.strftime('%Y-%m-%d') }}</time>
+            <span class="text-xs text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                阅读全文 →
+            </span>
+        </div>
+    </article>
+    {% else %}
+    <div class="text-center py-20">
+        <div class="text-6xl mb-4">📝</div>
+        <p class="text-gray-500 text-lg mb-2">暂无文章</p>
+        <p class="text-gray-400 text-sm">将 Markdown 文件放入 <code class="bg-gray-100 px-2 py-0.5 rounded">content/</code> 目录后同步</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
