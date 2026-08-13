@@ -6,14 +6,42 @@
     <p class="text-gray-500">记录思考，分享知识</p>
 </div>
 
-<div class="space-y-6">
+<!-- Category filter -->
+{% if categories %}
+<div class="flex flex-wrap gap-2 mb-8">
+    <a href="/"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
+              {% if not current_category %}bg-blue-600 text-white shadow-sm{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+        全部
+    </a>
+    {% for cat in categories %}
+    <a href="/category/{{ cat }}"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
+              {% if current_category == cat %}bg-blue-600 text-white shadow-sm{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+        {{ cat }}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Article list -->
+<div class="space-y-5">
     {% for article in articles %}
+    {% set category = article.slug.split('/')[0] if '/' in article.slug else '' %}
     <article class="group bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 border border-gray-100 hover:border-blue-100">
         <div class="flex justify-between items-start mb-3">
-            <a href="/article/{{ article.slug }}"
-               class="text-xl font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                {{ article.title }}
-            </a>
+            <div class="flex items-center gap-3 min-w-0">
+                {% if category %}
+                <a href="/category/{{ category }}"
+                   class="flex-shrink-0 text-xs font-medium bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full border border-blue-100 hover:bg-blue-100 transition-colors">
+                    {{ category }}
+                </a>
+                {% endif %}
+                <a href="/article/{{ article.slug }}"
+                   class="text-xl font-semibold text-gray-800 group-hover:text-blue-600 transition-colors truncate">
+                    {{ article.title }}
+                </a>
+            </div>
             <div class="flex items-center space-x-2 ml-4 flex-shrink-0">
                 {% if article.visibility == 'private' %}
                 <span class="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full border border-red-100">🔒 仅自己</span>
@@ -26,7 +54,7 @@
             </div>
         </div>
         {% if article.summary %}
-        <p class="text-gray-600 text-sm mb-4 leading-relaxed">{{ article.summary }}</p>
+        <p class="text-gray-600 text-sm mb-4 leading-relaxed ml-0 {% if category %}ml-0{% endif %}">{{ article.summary }}</p>
         {% endif %}
         <div class="flex items-center justify-between">
             <time class="text-xs text-gray-400 font-mono">{{ article.created_at.strftime('%Y-%m-%d') }}</time>
@@ -39,7 +67,11 @@
     <div class="text-center py-20">
         <div class="text-6xl mb-4">📝</div>
         <p class="text-gray-500 text-lg mb-2">暂无文章</p>
+        {% if current_category %}
+        <p class="text-gray-400 text-sm">该分类下暂无文章，<a href="/" class="text-blue-500 hover:underline">查看全部</a></p>
+        {% else %}
         <p class="text-gray-400 text-sm">将 Markdown 文件放入 <code class="bg-gray-100 px-2 py-0.5 rounded">content/</code> 目录后同步</p>
+        {% endif %}
     </div>
     {% endfor %}
 </div>

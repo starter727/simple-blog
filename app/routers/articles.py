@@ -20,6 +20,19 @@ router = APIRouter(tags=["articles"])
 content_dir = Path(settings.CONTENT_DIR)
 
 
+def _extract_category(slug: str) -> str:
+    """Extract first-level directory from slug as category.
+
+    "tech/python-basics"  → "tech"
+    "notes/daily/2026-08-11" → "notes"
+    "hello-world" → ""
+    """
+    parts = slug.split("/")
+    if len(parts) >= 2:
+        return parts[0]
+    return ""
+
+
 @router.get("/")
 async def article_list(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -36,8 +49,53 @@ async def article_list(request: Request, db: Session = Depends(get_db)):
             .order_by(Article.created_at.desc())
             .all()
         )
+
+    # Extract categories
+    categories = sorted(set(
+        _extract_category(a.slug) for a in articles if _extract_category(a.slug)
+    ))
+
     return templates.TemplateResponse(
-        request, "articles/list.html", {"articles": articles, "current_user": user},
+        request, "articles/list.html", {
+            "articles": articles,
+            "current_user": user,
+            "categories": categories,
+            "current_category": None,
+        },
+    )
+
+
+@router.get("/category/{category}")
+async def article_list_by_category(request: Request, category: str, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if user and user.is_admin:
+        articles = (
+            db.query(Article)
+            .order_by(Article.created_at.desc())
+            .all()
+        )
+    else:
+        articles = (
+            db.query(Article)
+            .filter(Article.is_published == True, Article.visibility == "public")
+            .order_by(Article.created_at.desc())
+            .all()
+        )
+
+    # Filter by category (first-level directory)
+    filtered = [a for a in articles if _extract_category(a.slug) == category]
+
+    categories = sorted(set(
+        _extract_category(a.slug) for a in articles if _extract_category(a.slug)
+    ))
+
+    return templates.TemplateResponse(
+        request, "articles/list.html", {
+            "articles": filtered,
+            "current_user": user,
+            "categories": categories,
+            "current_category": category,
+        },
     )
 
 
@@ -78,9 +136,10 @@ async def article_detail(request: Request, slug: str, db: Session = Depends(get_
             pass  # fall back to DB content
 
     html_content = render_markdown(content)
+    category = _extract_category(article.slug)
     return templates.TemplateResponse(
         request, "articles/detail.html",
-        {"article": article, "html_content": html_content, "current_user": user},
+        {"article": article, "html_content": html_content, "current_user": user, "category": category},
     )
 
 
