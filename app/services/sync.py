@@ -1,7 +1,11 @@
-"""Sync Markdown files from content/ directory to database.
+"""Sync Markdown files to database.
+
+Supports two modes:
+  1. Local: Read from content/ directory (default)
+  2. Remote: Read from GitHub repository (set GITHUB_CONTENT_REPO)
 
 Key rule: new articles (not in DB) default to visibility='private'.
-Existing articles keep their DB metadata; only content is refreshed from file.
+Existing articles keep their DB metadata; only content is refreshed.
 """
 
 from pathlib import Path
@@ -11,17 +15,32 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.article import Article
 from app.models.user import User
-from app.services.content_loader import load_all_articles, ArticleFile
+from app.services.content_loader import (
+    load_all_articles,
+    load_all_articles_from_github,
+    ArticleFile,
+)
 
 content_dir = Path(settings.CONTENT_DIR)
 
 
 def sync_articles(db: Session) -> dict:
     """
-    Scan content directory and sync with database.
+    Scan content source and sync with database.
     Returns {created: int, updated: int, unchanged: int}.
     """
-    files = load_all_articles(content_dir)
+    # Load articles based on configuration
+    if settings.use_github_content:
+        print(f"📡 Loading content from GitHub: {settings.GITHUB_CONTENT_REPO}")
+        files = load_all_articles_from_github(
+            repo=settings.GITHUB_CONTENT_REPO,
+            content_path=settings.GITHUB_CONTENT_PATH,
+            branch=settings.GITHUB_CONTENT_BRANCH,
+        )
+    else:
+        print(f"📁 Loading content from local: {content_dir}")
+        files = load_all_articles(content_dir)
+
     stats = {"created": 0, "updated": 0, "unchanged": 0}
 
     # Get admin user (author for all synced articles)

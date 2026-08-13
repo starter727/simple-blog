@@ -12,7 +12,11 @@ from app.models.article import Article
 from app.auth_utils import get_current_user
 from app.services.permission import check_article_access, AccessResult
 from app.services.markdown_service import render_markdown
-from app.services.content_loader import find_article_file, load_article
+from app.services.content_loader import (
+    find_article_file,
+    load_article,
+    find_article_from_github,
+)
 from app.templates_config import templates
 
 router = APIRouter(tags=["articles"])
@@ -125,15 +129,31 @@ async def article_detail(request: Request, slug: str, db: Session = Depends(get_
             status_code=403,
         )
 
-    # Load content from file (falls back to DB content if file not found)
+    # Load content from source (falls back to DB content if not found)
     content = article.content
-    filepath = find_article_file(content_dir, slug)
-    if filepath:
+
+    if settings.use_github_content:
+        # Load from GitHub
         try:
-            af = load_article(filepath, content_dir)
-            content = af.content
+            af = find_article_from_github(
+                repo=settings.GITHUB_CONTENT_REPO,
+                slug=slug,
+                content_path=settings.GITHUB_CONTENT_PATH,
+                branch=settings.GITHUB_CONTENT_BRANCH,
+            )
+            if af:
+                content = af.content
         except Exception:
             pass  # fall back to DB content
+    else:
+        # Load from local file
+        filepath = find_article_file(content_dir, slug)
+        if filepath:
+            try:
+                af = load_article(filepath, content_dir)
+                content = af.content
+            except Exception:
+                pass  # fall back to DB content
 
     html_content = render_markdown(content)
     category = _extract_category(article.slug)

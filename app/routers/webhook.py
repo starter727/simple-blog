@@ -1,8 +1,7 @@
-"""Webhook endpoint: GitHub push → git pull → sync."""
+"""Webhook endpoint: GitHub push → sync."""
 
 import hashlib
 import hmac
-import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Request, Depends, HTTPException
@@ -20,7 +19,7 @@ content_dir = Path(settings.CONTENT_DIR)
 
 @router.post("/webhook/github")
 async def github_webhook(request: Request, db: Session = Depends(get_db)):
-    """Receive GitHub push webhook, pull latest, and sync articles."""
+    """Receive GitHub push webhook and sync articles."""
 
     # Verify webhook secret if configured
     secret = settings.WEBHOOK_SECRET
@@ -33,28 +32,12 @@ async def github_webhook(request: Request, db: Session = Depends(get_db)):
         if not hmac.compare_digest(signature, expected):
             raise HTTPException(status_code=403, detail="Invalid signature")
 
-    # git pull in content directory
-    try:
-        result = subprocess.run(
-            ["git", "pull", "--rebase"],
-            cwd=str(content_dir),
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            return JSONResponse(
-                status_code=500,
-                content={"error": "git pull failed", "detail": result.stderr},
-            )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
     # Sync articles to database
+    # If using GitHub content, it will fetch from GitHub API
+    # If using local content, it will read from local directory
     stats = sync_articles(db)
 
     return {
         "status": "ok",
-        "git": result.stdout.strip(),
         "sync": stats,
     }

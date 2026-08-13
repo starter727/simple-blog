@@ -4,15 +4,24 @@ Supports nested directories:
   content/tech/python-basics.md       → slug: tech/python-basics
   content/notes/daily/2026-08-11.md   → slug: notes/daily/2026-08-11
   content/hello-world.md              → slug: hello-world
+
+Supports two modes:
+  1. Local: Read from content/ directory (default)
+  2. Remote: Read from GitHub repository (set GITHUB_CONTENT_REPO)
 """
 
 from __future__ import annotations
 
 import re
+import base64
 from pathlib import Path
 from dataclasses import dataclass, field
+from typing import Optional
 
+import httpx
 import yaml
+
+from app.config import settings
 
 
 @dataclass
@@ -65,6 +74,53 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
     return {}, text
 
 
+def _fetch_github_file(repo: str, path: str, branch: str = "main") -> Optional[str]:
+    """Fetch file content from GitHub repository.
+
+    Args:
+        repo: GitHub repository in format "owner/repo"
+        path: File path relative to repository root
+        branch: Branch name (default: main)
+
+    Returns:
+        File content as string, or None if not found
+    """
+    url = f"https://raw.githubusercontent.com/{repo}/{branch}/{path}"
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(url)
+            if response.status_code == 200:
+                return response.text
+            return None
+    except Exception as e:
+        print(f"[WARN] Failed to fetch {url}: {e}")
+        return None
+
+
+def _fetch_github_directory(repo: str, path: str = "", branch: str = "main") -> list[str]:
+    """Fetch list of files in GitHub directory.
+
+    Args:
+        repo: GitHub repository in format "owner/repo"
+        path: Directory path relative to repository root
+        branch: Branch name (default: main)
+
+    Returns:
+        List of file paths (relative to repository root)
+    """
+    url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(url)
+            if response.status_code == 200:
+                items = response.json()
+                return [item["path"] for item in items if item["type"] == "file"]
+            return []
+    except Exception as e:
+        print(f"[WARN] Failed to fetch directory {url}: {e}")
+        return []
+
+
 def load_article(filepath: Path, content_dir: Path) -> ArticleFile:
     """Load a single .md file and return parsed ArticleFile."""
     raw = filepath.read_text(encoding="utf-8")
@@ -75,6 +131,38 @@ def load_article(filepath: Path, content_dir: Path) -> ArticleFile:
 
     return ArticleFile(
         filepath=filepath,
+        rel_path=rel_path,
+        title=meta.get("title", Path(rel_path).stem.replace("-", " ").title()),
+        slug=meta.get("slug", slug_from_path),
+        summary=meta.get("summary", ""),
+        visibility=meta.get("visibility", "private"),
+        password=meta.get("password", ""),
+        published=meta.get("published", False),
+        content=body,
+        tags=meta.get("tags", []),
+    )
+
+
+def load_article_from_github(repo: str, rel_path: str, branch: str = "main") -> Optional[ArticleFile]:
+    """Load a single .md file from GitHub and return parsed ArticleFile.
+
+    Args:
+        repo: GitHub repository in format "owner/repo"
+        rel_path: File path relative to repository root (e.g., "content/tech/python-basics.md")
+        branch: Branch name (default: main)
+
+    Returns:
+        ArticleFile if successful, None otherwise
+    """
+    raw = _fetch_github_file(repo, rel_path, branch)
+    if not raw:
+        return None
+
+    meta, body = _parse_frontmatter(raw)
+    slug_from_path = _make_slug(rel_path)
+
+    return ArticleFile(
+        filepath=Path(rel_path),  # Use relative path as identifier
         rel_path=rel_path,
         title=meta.get("title", Path(rel_path).stem.replace("-", " ").title()),
         slug=meta.get("slug", slug_from_path),
@@ -103,6 +191,42 @@ def load_all_articles(content_dir: Path) -> list[ArticleFile]:
     return articles
 
 
+def load_all_articles_from_github(repo: str, content_path: str = "content", branch: str = "main") -> list[ArticleFile]:
+    """Load all .md files from GitHub repository.
+
+    Args:
+        repo: GitHub repository in format "owner/repo"
+        content_path: Path to content directory in repository
+        branch: Branch name (default: main)
+
+    Returns:
+        List of ArticleFile objects
+    """
+    articles = []
+
+    # Get list of all files in content directory
+    files = _fetch_github_directory(repo, content_path, branch)
+
+    for file_path in files:
+        # Only process .md files
+        if not file_path.endswith(".md"):
+            continue
+
+        # Skip files starting with _ (drafts, partials, etc.)
+        filename = Path(file_path).name
+        if filename.startswith("_"):
+            continue
+
+        # Load article
+        article = load_article_from_github(repo, file_path, branch)
+        if article:
+            articles.append(article)
+        else:
+            print(f"[WARN] Failed to load {file_path} from GitHub")
+
+    return articles
+
+
 def find_article_file(content_dir: Path, slug: str) -> Path | None:
     """Find the .md file matching a given slug.
 
@@ -117,4 +241,23 @@ def find_article_file(content_dir: Path, slug: str) -> Path | None:
                 return filepath
         except Exception:
             continue
+    return None
+
+
+def find_article_from_github(repo: str, slug: str, content_path: str = "content", branch: str = "main") -> Optional[ArticleFile]:
+    """Find and load article from GitHub by slug.
+
+    Args:
+        repo: GitHub repository in format "owner/repo"
+        slug: Article slug to find
+        content_path: Path to content directory in repository
+        branch: Branch name (default: main)
+
+    Returns:
+        ArticleFile if found, None otherwise
+    """
+    articles = load_all_articles_from_github(repo, content_path, branch)
+    for article in articles:
+        if article.slug == slug:
+            return article
     return None

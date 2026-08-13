@@ -16,10 +16,11 @@ dependencies = [
     "pygments>=2.17",
     "itsdangerous>=2.1",
     "pydantic-settings>=2.0",
+    "httpx>=0.24.0",
 ]
 
 [project.optional-dependencies]
-dev = ["httpx", "pytest"]
+dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
