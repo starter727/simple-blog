@@ -50,6 +50,7 @@ async def update_metadata(
     article_id: int,
     visibility: str = Form("public"),
     password: str = Form(""),
+    clear_password: str = Form(""),
     is_published: str = Form("false"),
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
@@ -58,8 +59,15 @@ async def update_metadata(
     if not article:
         return RedirectResponse(url="/admin/", status_code=303)
     article.visibility = visibility
-    if password.strip():
+
+    # 密码处理逻辑
+    if clear_password == "on":
+        # 清除密码保护
+        article.password_hash = None
+    elif password.strip():
+        # 设置新密码
         article.password_hash = hash_password(password)
+
     article.is_published = is_published == "true"
     db.commit()
     return RedirectResponse(url="/admin/", status_code=303)
