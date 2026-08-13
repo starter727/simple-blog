@@ -1,13 +1,30 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from app.config import settings
 
+# SQLite 优化配置
+connect_args = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args=connect_args,
     echo=settings.DEBUG,
+    pool_pre_ping=True,  # 连接健康检查
 )
+
+# SQLite 性能优化
+if settings.DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")  # 写入日志模式
+        cursor.execute("PRAGMA synchronous=NORMAL")  # 平衡性能和安全
+        cursor.execute("PRAGMA cache_size=10000")  # 增加缓存
+        cursor.execute("PRAGMA foreign_keys=ON")  # 启用外键
+        cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
