@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # Branch to use (default: main)
     GITHUB_CONTENT_BRANCH: str = "main"
 
+    # GitHub Token for private repositories (required for private repos)
+    # Generate at: https://github.com/settings/tokens
+    # Required permissions: repo (Full control of private repositories)
+    GITHUB_TOKEN: Optional[str] = None
+
     # Auth - 必须通过环境变量或 .env 文件提供
     SECRET_KEY: str = Field(
         ...,  # ... 表示必填

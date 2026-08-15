@@ -36,6 +36,7 @@ def sync_articles(db: Session) -> dict:
             repo=settings.GITHUB_CONTENT_REPO,
             content_path=settings.GITHUB_CONTENT_PATH,
             branch=settings.GITHUB_CONTENT_BRANCH,
+            token=settings.GITHUB_TOKEN,
         )
     else:
         print(f"📁 Loading content from local: {content_dir}")

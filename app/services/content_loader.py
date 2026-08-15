@@ -74,21 +74,33 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
     return {}, text
 
 
-def _fetch_github_file(repo: str, path: str, branch: str = "main") -> Optional[str]:
+def _fetch_github_file(repo: str, path: str, branch: str = "main", token: Optional[str] = None) -> Optional[str]:
     """Fetch file content from GitHub repository.
 
     Args:
         repo: GitHub repository in format "owner/repo"
         path: File path relative to repository root
         branch: Branch name (default: main)
+        token: GitHub personal access token (required for private repos)
 
     Returns:
         File content as string, or None if not found
     """
-    url = f"https://raw.githubusercontent.com/{repo}/{branch}/{path}"
+    # Use GitHub API for private repos (requires token)
+    if token:
+        url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3.raw",
+        }
+    else:
+        # Use raw.githubusercontent.com for public repos (no token needed)
+        url = f"https://raw.githubusercontent.com/{repo}/{branch}/{path}"
+        headers = {}
+
     try:
         with httpx.Client(timeout=10.0) as client:
-            response = client.get(url)
+            response = client.get(url, headers=headers)
             if response.status_code == 200:
                 return response.text
             return None
@@ -97,21 +109,26 @@ def _fetch_github_file(repo: str, path: str, branch: str = "main") -> Optional[s
         return None
 
 
-def _fetch_github_directory(repo: str, path: str = "", branch: str = "main") -> list[str]:
+def _fetch_github_directory(repo: str, path: str = "", branch: str = "main", token: Optional[str] = None) -> list[str]:
     """Fetch list of files in GitHub directory.
 
     Args:
         repo: GitHub repository in format "owner/repo"
         path: Directory path relative to repository root
         branch: Branch name (default: main)
+        token: GitHub personal access token (required for private repos)
 
     Returns:
         List of file paths (relative to repository root)
     """
     url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
+    headers = {}
+    if token:
+        headers["Authorization"] = f"token {token}"
+
     try:
         with httpx.Client(timeout=10.0) as client:
-            response = client.get(url)
+            response = client.get(url, headers=headers)
             if response.status_code == 200:
                 items = response.json()
                 return [item["path"] for item in items if item["type"] == "file"]
@@ -143,18 +160,19 @@ def load_article(filepath: Path, content_dir: Path) -> ArticleFile:
     )
 
 
-def load_article_from_github(repo: str, rel_path: str, branch: str = "main") -> Optional[ArticleFile]:
+def load_article_from_github(repo: str, rel_path: str, branch: str = "main", token: Optional[str] = None) -> Optional[ArticleFile]:
     """Load a single .md file from GitHub and return parsed ArticleFile.
 
     Args:
         repo: GitHub repository in format "owner/repo"
         rel_path: File path relative to repository root (e.g., "content/tech/python-basics.md")
         branch: Branch name (default: main)
+        token: GitHub personal access token (required for private repos)
 
     Returns:
         ArticleFile if successful, None otherwise
     """
-    raw = _fetch_github_file(repo, rel_path, branch)
+    raw = _fetch_github_file(repo, rel_path, branch, token)
     if not raw:
         return None
 
@@ -191,13 +209,14 @@ def load_all_articles(content_dir: Path) -> list[ArticleFile]:
     return articles
 
 
-def load_all_articles_from_github(repo: str, content_path: str = "content", branch: str = "main") -> list[ArticleFile]:
+def load_all_articles_from_github(repo: str, content_path: str = "content", branch: str = "main", token: Optional[str] = None) -> list[ArticleFile]:
     """Load all .md files from GitHub repository.
 
     Args:
         repo: GitHub repository in format "owner/repo"
         content_path: Path to content directory in repository
         branch: Branch name (default: main)
+        token: GitHub personal access token (required for private repos)
 
     Returns:
         List of ArticleFile objects
@@ -205,7 +224,7 @@ def load_all_articles_from_github(repo: str, content_path: str = "content", bran
     articles = []
 
     # Get list of all files in content directory
-    files = _fetch_github_directory(repo, content_path, branch)
+    files = _fetch_github_directory(repo, content_path, branch, token)
 
     for file_path in files:
         # Only process .md files
@@ -218,7 +237,7 @@ def load_all_articles_from_github(repo: str, content_path: str = "content", bran
             continue
 
         # Load article
-        article = load_article_from_github(repo, file_path, branch)
+        article = load_article_from_github(repo, file_path, branch, token)
         if article:
             articles.append(article)
         else:
