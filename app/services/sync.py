@@ -49,6 +49,7 @@ def sync_articles(db: Session) -> dict:
         raise RuntimeError("No admin user found. Run init_admin.py first.")
 
     existing_slugs = {a.slug: a for a in db.query(Article).all()}
+    existing_contents = {a.content: a for a in db.query(Article).all()}
     file_slugs = set()
 
     # Check for duplicate slugs in this batch
@@ -71,20 +72,31 @@ def sync_articles(db: Session) -> dict:
         existing = existing_slugs.get(af.slug)
 
         if existing is None:
-            # NEW article → always private by default
-            article = Article(
-                title=af.title,
-                slug=af.slug,
-                content=af.content,
-                summary=af.summary,
-                visibility="private",          # ← 默认仅自己可见
-                password_hash=None,
-                is_published=af.published,
-                author_id=admin.id,
-            )
-            db.add(article)
-            stats["created"] += 1
-            print(f"✅ 创建新文章: {af.slug}")
+            # Check if content matches any existing article (file moved or slug changed)
+            content_match = existing_contents.get(af.content)
+            if content_match:
+                # File moved or slug changed! Migrate permissions
+                print(f"🔄 检测到 slug 变更: {content_match.slug} → {af.slug}")
+                content_match.slug = af.slug
+                content_match.title = af.title
+                content_match.summary = af.summary
+                stats["updated"] += 1
+                print(f"✅ 已迁移权限: {af.slug}")
+            else:
+                # Truly new article
+                article = Article(
+                    title=af.title,
+                    slug=af.slug,
+                    content=af.content,
+                    summary=af.summary,
+                    visibility="private",          # ← 默认仅自己可见
+                    password_hash=None,
+                    is_published=af.published,
+                    author_id=admin.id,
+                )
+                db.add(article)
+                stats["created"] += 1
+                print(f"✅ 创建新文章: {af.slug}")
         else:
             # EXISTING article → keep DB metadata, refresh content
             changed = False
