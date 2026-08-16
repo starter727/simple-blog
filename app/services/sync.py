@@ -18,6 +18,8 @@ from app.models.user import User
 from app.services.content_loader import (
     load_all_articles,
     load_all_articles_from_github,
+    find_article_file,
+    load_article,
     ArticleFile,
 )
 
@@ -87,12 +89,22 @@ def sync_articles(db: Session) -> dict:
                 # Truly new article
                 # 使用文件中的 visibility，如果没有则默认为 draft
                 visibility = af.visibility if af.visibility in ["public", "private", "restricted", "draft"] else "draft"
+
+                # Draft 文章不保存内容，只保存元数据
+                if visibility == "draft":
+                    content = ""
+                    summary = ""
+                    print(f"📝 Draft 文章，仅保存元数据: {af.slug}")
+                else:
+                    content = af.content
+                    summary = af.summary
+
                 article = Article(
                     title=af.title,
                     slug=af.slug,
-                    content=af.content,
-                    summary=af.summary,
-                    visibility=visibility,          # ← 使用文件中的visibility，否则默认draft
+                    content=content,
+                    summary=summary,
+                    visibility=visibility,
                     password_hash=None,
                     is_published=af.published,
                     author_id=admin.id,
@@ -103,15 +115,26 @@ def sync_articles(db: Session) -> dict:
         else:
             # EXISTING article → keep DB metadata, refresh content
             changed = False
-            if existing.content != af.content:
-                existing.content = af.content
-                changed = True
-            if existing.title != af.title:
-                existing.title = af.title
-                changed = True
-            if existing.summary != af.summary:
-                existing.summary = af.summary
-                changed = True
+
+            # Draft 文章不更新内容
+            if existing.visibility == "draft":
+                # 只更新标题
+                if existing.title != af.title:
+                    existing.title = af.title
+                    changed = True
+                print(f"📝 Draft 文章，仅更新标题: {af.slug}")
+            else:
+                # 正常更新内容
+                if existing.content != af.content:
+                    existing.content = af.content
+                    changed = True
+                if existing.title != af.title:
+                    existing.title = af.title
+                    changed = True
+                if existing.summary != af.summary:
+                    existing.summary = af.summary
+                    changed = True
+
             if changed:
                 stats["updated"] += 1
                 print(f"📝 更新文章: {af.slug}")
@@ -186,3 +209,50 @@ def sync_articles_with_migration(db: Session) -> dict:
 
     db.commit()
     return stats
+
+
+def sync_single_article(db: Session, slug: str) -> bool:
+    """
+    Sync a single article's content from source.
+    Used when changing visibility from draft to other.
+    Returns True if successful.
+    """
+    try:
+        # Load article from source
+        if settings.use_github_content:
+            from app.services.content_loader import find_article_from_github
+            af = find_article_from_github(
+                repo=settings.GITHUB_CONTENT_REPO,
+                slug=slug,
+                content_path=settings.GITHUB_CONTENT_PATH,
+                branch=settings.GITHUB_CONTENT_BRANCH,
+            )
+        else:
+            filepath = find_article_file(content_dir, slug)
+            if filepath:
+                af = load_article(filepath, content_dir)
+            else:
+                af = None
+
+        if not af:
+            print(f"⚠️ 未找到文章文件: {slug}")
+            return False
+
+        # Update article in database
+        article = db.query(Article).filter(Article.slug == slug).first()
+        if not article:
+            print(f"⚠️ 数据库中未找到文章: {slug}")
+            return False
+
+        article.content = af.content
+        article.summary = af.summary
+        article.title = af.title
+        db.commit()
+
+        print(f"✅ 已同步文章内容: {slug}")
+        return True
+
+    except Exception as e:
+        print(f"❌ 同步文章失败: {slug} - {str(e)}")
+        db.rollback()
+        return False

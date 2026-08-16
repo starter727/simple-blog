@@ -70,6 +70,14 @@ async def update_metadata(
     article = db.query(Article).filter(Article.id == article_id).first()
     if not article:
         return RedirectResponse(url="/admin/", status_code=303)
+
+    # 如果从 draft 改为其他可见性，需要同步内容
+    if article.visibility == "draft" and visibility != "draft":
+        print(f"🔄 文章从 draft 改为 {visibility}，同步内容: {article.slug}")
+        # 重新同步这篇文章的内容
+        from app.services.sync import sync_single_article
+        sync_single_article(db, article.slug)
+
     article.visibility = visibility
 
     # 密码处理逻辑

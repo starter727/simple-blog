@@ -135,13 +135,20 @@ async def article_detail(request: Request, slug: str, db: Session = Depends(get_
             status_code=404,
         )
 
-    # Draft 文章只有作者能访问
+    # Draft 文章只有作者能访问，但不显示内容
     if article.visibility == "draft":
         if not user or user.id != article.author_id:
             return templates.TemplateResponse(
                 request, "articles/not_found.html", {"current_user": user},
                 status_code=404,
             )
+        # Draft 文章：只显示标题，不显示内容
+        category = _extract_category(article.slug)
+        breadcrumb = _extract_breadcrumb(article.slug)
+        return templates.TemplateResponse(
+            request, "articles/draft.html",
+            {"article": article, "current_user": user, "category": category, "breadcrumb": breadcrumb},
+        )
 
     # Check permission
     already_unlocked = request.session.get(f"unlocked_{article.id}", False)
