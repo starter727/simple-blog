@@ -22,6 +22,7 @@
                 <option value="public" {{ 'selected' if article.visibility == 'public' }}>🌍 公开 - 所有人可见</option>
                 <option value="restricted" {{ 'selected' if article.visibility == 'restricted' }}>👥 部分可见 - 指定用户</option>
                 <option value="private" {{ 'selected' if article.visibility == 'private' }}>🔒 仅自己可见</option>
+                <option value="draft" {{ 'selected' if article.visibility == 'draft' }}>📝 草稿 - 完全隐藏</option>
             </select>
         </div>
 

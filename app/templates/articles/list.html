@@ -43,7 +43,9 @@
                 </a>
             </div>
             <div class="flex items-center space-x-2 ml-4 flex-shrink-0">
-                {% if article.visibility == 'private' %}
+                {% if article.visibility == 'draft' %}
+                <span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full border border-gray-200">📝 草稿</span>
+                {% elif article.visibility == 'private' %}
                 <span class="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full border border-red-100">🔒 仅自己</span>
                 {% elif article.visibility == 'restricted' %}
                 <span class="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-100">👥 部分可见</span>

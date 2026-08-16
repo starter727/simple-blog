@@ -85,19 +85,21 @@ def sync_articles(db: Session) -> dict:
                 print(f"✅ 已迁移权限: {af.slug}")
             else:
                 # Truly new article
+                # 使用文件中的 visibility，如果没有则默认为 draft
+                visibility = af.visibility if af.visibility in ["public", "private", "restricted", "draft"] else "draft"
                 article = Article(
                     title=af.title,
                     slug=af.slug,
                     content=af.content,
                     summary=af.summary,
-                    visibility="private",          # ← 默认仅自己可见
+                    visibility=visibility,          # ← 使用文件中的visibility，否则默认draft
                     password_hash=None,
                     is_published=af.published,
                     author_id=admin.id,
                 )
                 db.add(article)
                 stats["created"] += 1
-                print(f"✅ 创建新文章: {af.slug}")
+                print(f"✅ 创建新文章: {af.slug} (visibility: {visibility})")
         else:
             # EXISTING article → keep DB metadata, refresh content
             changed = False

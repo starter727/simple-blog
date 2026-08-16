@@ -29,7 +29,19 @@ async def admin_list(request: Request, admin=Depends(require_admin), db: Session
 @router.post("/sync")
 async def manual_sync(request: Request, admin=Depends(require_admin), db: Session = Depends(get_db)):
     stats = sync_articles(db)
-    return RedirectResponse(url="/admin/?synced=1", status_code=303)
+    # 构建同步结果消息
+    messages = []
+    if stats.get("created"):
+        messages.append(f"创建 {stats['created']} 篇")
+    if stats.get("updated"):
+        messages.append(f"更新 {stats['updated']} 篇")
+    if stats.get("unchanged"):
+        messages.append(f"{stats['unchanged']} 篇未变")
+    if stats.get("errors"):
+        messages.append(f"{len(stats['errors'])} 个错误")
+
+    message = "、".join(messages) if messages else "无变化"
+    return RedirectResponse(url=f"/admin/?synced=1&message={message}", status_code=303)
 
 
 # ---------- edit metadata ----------

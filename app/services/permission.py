@@ -47,21 +47,26 @@ def check_article_access(
 
     Priority:
       1. Author always has access.
-      2. visibility == "private"  → only author.
-      3. visibility == "restricted" → must be in ArticleAccess list.
-      4. Article has a password → caller must supply it.
-      5. Otherwise → allowed.
+      2. visibility == "draft"  → only author (completely hidden from lists).
+      3. visibility == "private"  → only author (visible in lists but content hidden).
+      4. visibility == "restricted" → must be in ArticleAccess list.
+      5. Article has a password → caller must supply it.
+      6. Otherwise → allowed.
     """
 
     # 1. Author
     if current_user and current_user.id == article.author_id:
         return AccessResult(AccessResult.ALLOWED)
 
-    # 2. Private
+    # 2. Draft (completely hidden)
+    if article.visibility == "draft":
+        return AccessResult(AccessResult.DENIED)
+
+    # 3. Private
     if article.visibility == "private":
         return AccessResult(AccessResult.DENIED)
 
-    # 3. Restricted
+    # 4. Restricted
     if article.visibility == "restricted":
         if not current_user:
             return AccessResult(AccessResult.DENIED)
@@ -69,7 +74,7 @@ def check_article_access(
         if current_user.id not in allowed_ids:
             return AccessResult(AccessResult.DENIED)
 
-    # 4. Password-protected
+    # 5. Password-protected
     if article.password_hash:
         if provided_password and verify_password(provided_password, article.password_hash):
             return AccessResult(AccessResult.ALLOWED)

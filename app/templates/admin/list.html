@@ -12,7 +12,12 @@
 </div>
 
 {% if request.query_params.get('synced') %}
-<div class="bg-green-50 text-green-700 px-4 py-2 rounded mb-4 text-sm">✅ 内容已同步</div>
+<div class="bg-green-50 text-green-700 px-4 py-2 rounded mb-4 text-sm">
+    ✅ 内容已同步
+    {% if request.query_params.get('message') %}
+    <span class="ml-2 text-green-600">({{ request.query_params.get('message') }})</span>
+    {% endif %}
+</div>
 {% endif %}
 
 <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -43,7 +48,8 @@
                     {% endif %}
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-600">
-                    {% if article.visibility == 'public' %}🌍 公开
+                    {% if article.visibility == 'draft' %}📝 草稿
+                    {% elif article.visibility == 'public' %}🌍 公开
                     {% elif article.visibility == 'private' %}🔒 仅自己
                     {% else %}👥 部分可见{% endif %}
                     {% if article.password_hash %} +密码{% endif %}

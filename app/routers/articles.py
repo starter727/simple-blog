@@ -37,19 +37,39 @@ def _extract_category(slug: str) -> str:
     return ""
 
 
+def _extract_breadcrumb(slug: str) -> list[dict]:
+    """Extract breadcrumb path from slug.
+
+    "tech/python-basics"  → [{"name": "tech", "path": "tech"}, {"name": "python-basics", "path": "tech/python-basics"}]
+    "notes/daily/2026-08-11" → [{"name": "notes", "path": "notes"}, {"name": "daily", "path": "notes/daily"}, {"name": "2026-08-11", "path": "notes/daily/2026-08-11"}]
+    """
+    parts = slug.split("/")
+    breadcrumb = []
+    for i, part in enumerate(parts):
+        path = "/".join(parts[:i+1])
+        breadcrumb.append({"name": part, "path": path})
+    return breadcrumb
+
+
 @router.get("/")
 async def article_list(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user and user.is_admin:
+        # 管理员可以看到所有文章（除了 draft）
         articles = (
             db.query(Article)
+            .filter(Article.visibility != "draft")
             .order_by(Article.created_at.desc())
             .all()
         )
     else:
+        # 普通用户只能看到公开且已发布的文章
         articles = (
             db.query(Article)
-            .filter(Article.is_published == True, Article.visibility == "public")
+            .filter(
+                Article.is_published == True,
+                Article.visibility == "public"
+            )
             .order_by(Article.created_at.desc())
             .all()
         )
@@ -115,6 +135,14 @@ async def article_detail(request: Request, slug: str, db: Session = Depends(get_
             status_code=404,
         )
 
+    # Draft 文章只有作者能访问
+    if article.visibility == "draft":
+        if not user or user.id != article.author_id:
+            return templates.TemplateResponse(
+                request, "articles/not_found.html", {"current_user": user},
+                status_code=404,
+            )
+
     # Check permission
     already_unlocked = request.session.get(f"unlocked_{article.id}", False)
     result = check_article_access(article, user)
@@ -157,9 +185,10 @@ async def article_detail(request: Request, slug: str, db: Session = Depends(get_
 
     html_content = render_markdown(content)
     category = _extract_category(article.slug)
+    breadcrumb = _extract_breadcrumb(article.slug)
     return templates.TemplateResponse(
         request, "articles/detail.html",
-        {"article": article, "html_content": html_content, "current_user": user, "category": category},
+        {"article": article, "html_content": html_content, "current_user": user, "category": category, "breadcrumb": breadcrumb},
     )
 
 

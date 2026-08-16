@@ -13,7 +13,7 @@ class Article(Base):
     slug = Column(String(200), unique=True, nullable=False, index=True)
     content = Column(Text, nullable=False)  # Markdown source
     summary = Column(String(500), default="")
-    visibility = Column(String(20), default="public")  # public | private | restricted
+    visibility = Column(String(20), default="public")  # public | private | restricted | draft
     password_hash = Column(String(128), nullable=True)  # optional article password
     is_published = Column(Boolean, default=False)
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
